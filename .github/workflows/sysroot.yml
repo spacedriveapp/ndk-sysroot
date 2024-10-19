@@ -1,0 +1,44 @@
+name: Extract NDK Sysroot
+on:
+  push:
+    tags:
+      - '*'
+    branches:
+      - main
+  pull_request:
+    paths:
+      - '.github/workflows/sdk.yml'
+  workflow_dispatch:
+
+# Cancel previous runs of the same workflow on the same branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sdks:
+    name: SDKs
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Extract and compress NDK Sysroot
+        run: |
+          set -euxo pipefail
+          export XZ_OPT="-T1 -9"
+          
+          SYSROOT="$(
+            find ${ANDROID_NDK_HOME:?}/toolchains -type d -name 'sysroot' -print | head -n1
+          )"
+
+          tar -cJf /tmp/ndk_sysroot.tar.xz -C "$SYSROOT" .
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          body: 'NDK Sysroot'
+          draft: true
+          files: '/tmp/ndk_sysroot.tar.xz'
+          fail_on_unmatched_files: true
